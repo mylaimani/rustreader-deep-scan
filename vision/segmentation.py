@@ -67,6 +67,72 @@ def build_object_mask(work_area_bgr):
     return object_mask
 
 
+MAXIMUM_BRIDGE_GAP_MM = 30.0
+
+
+def long_axis_of_piece(contour):
+    """(center, unit direction of the long side, short-side width) from the min-area rectangle."""
+    (center_x, center_y), (side_a, side_b), angle_degrees = cv2.minAreaRect(contour)
+    angle = np.deg2rad(angle_degrees)
+    if side_a >= side_b:
+        direction = np.array([np.cos(angle), np.sin(angle)])
+        width = side_b
+    else:
+        direction = np.array([-np.sin(angle), np.cos(angle)])
+        width = side_a
+    return np.array([center_x, center_y]), direction, width
+
+
+def piece_lies_on_axis(contour, center, direction, width):
+    """True if another piece sits on the extension of the long piece's axis, within the gap limit.
+    Returns (on_axis, near_end_point_of_other_piece_along_axis)."""
+    points = contour.reshape(-1, 2).astype(np.float64) - center
+    along = points @ direction
+    across = points @ np.array([-direction[1], direction[0]])
+    other_center_across = np.median(across)
+    if abs(other_center_across) > width * 0.75:
+        return False, None
+    return True, (float(along.min()), float(along.max()))
+
+
+def bridge_aligned_pieces(contours, image_shape):
+    """A bright, shiny (zinc-plated) shank can be lighter than the detection threshold, splitting
+    one bolt into a dark head and dark threads. Join pieces lying on the long piece's axis with a
+    bar as wide as that piece. Pieces off the axis (a genuine second bolt) are left alone."""
+    if len(contours) < 2:
+        return contours
+    long_piece = max(contours, key=lambda contour: max(cv2.minAreaRect(contour)[1]) / max(min(cv2.minAreaRect(contour)[1]), 1))
+    center, direction, width = long_axis_of_piece(long_piece)
+    long_points_along = (long_piece.reshape(-1, 2) - center) @ direction
+    mask = np.zeros(image_shape[:2], dtype=np.uint8)
+    cv2.drawContours(mask, [long_piece], -1, 255, cv2.FILLED)
+    remaining = []
+    for contour in contours:
+        if contour is long_piece:
+            continue
+        on_axis, other_span = piece_lies_on_axis(contour, center, direction, width)
+        gap_limit = MAXIMUM_BRIDGE_GAP_MM * mat_layout.PIXELS_PER_MM
+        if on_axis and other_span[0] - long_points_along.max() < gap_limit and long_points_along.min() - other_span[1] < gap_limit:
+            draw_bridge(mask, center, direction, width, long_points_along, other_span)
+            cv2.drawContours(mask, [contour], -1, 255, cv2.FILLED)
+        else:
+            remaining.append(contour)
+    merged, _hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    return sorted(list(merged) + remaining, key=cv2.contourArea, reverse=True)
+
+
+def draw_bridge(mask, center, direction, width, long_points_along, other_span):
+    """Filled bar along the axis between the long piece's end and the other piece."""
+    if other_span[0] > long_points_along.max():
+        start, end = long_points_along.max() - 2, other_span[0] + 2
+    else:
+        start, end = other_span[1] - 2, long_points_along.min() + 2
+    across = np.array([-direction[1], direction[0]]) * (width * 0.92 / 2)
+    corners = [center + direction * start + across, center + direction * end + across,
+               center + direction * end - across, center + direction * start - across]
+    cv2.fillPoly(mask, [np.round(np.array(corners)).astype(np.int32)], 255)
+
+
 def find_fastener_contours(rectified_bgr):
     """Return (contours_in_rectified_coordinates sorted largest first,
                touches_border flag for the largest one)."""
@@ -82,6 +148,7 @@ def find_fastener_contours(rectified_bgr):
     minimum_area_pixels = MINIMUM_OBJECT_AREA_MM2 * scale * scale
     kept_contours = [contour for contour in contours if cv2.contourArea(contour) >= minimum_area_pixels]
     kept_contours.sort(key=cv2.contourArea, reverse=True)
+    kept_contours = bridge_aligned_pieces(kept_contours, object_mask.shape)
 
     touches_border = False
     if kept_contours:

@@ -102,31 +102,37 @@ rust on the mat, then warps them into a perspective "phone photo" with blur and 
 |---|---|
 | Photos | 11 (8 measurable, 3 deliberate failures) |
 | Correct thread spec when identified | 8/8 (incl. fine thread M12x1.25 under heavy rust, 5/16-18 UNC, partially threaded M10x80, M6x16 countersunk, M8x25 socket head, one marker covered) |
-| Length error | mean 0.04 mm, max 0.33 mm |
-| Pitch error | mean 0.00 mm, max 0.01 mm |
-| Diameter error | mean 0.28 mm, max 0.44 mm (systematic under-read, see limitations) |
+| Length error | mean 0.03 mm, max 0.25 mm |
+| Pitch error | mean 0.00 mm, max 0.01 mm (n=8) |
+| Diameter error | mean 0.38 mm, max 0.61 mm (systematic under-read, see limitations) |
 | Failure photos (blurry, two bolts, worn threads) | 3/3 correctly sent back for a new photo |
 | Processing time | median 125 ms per photo (Mac, Arm); 761 ms round trip to Lambda in Sydney (smoke test) |
 
-### 7.2 Real rusted bolts
-_To be filled from `eval/ground_truth_results_summary.txt`: N bolts measured with a digital
-caliper and pitch gauge, 2 photos each, mixed rust levels._
+### 7.2 Real fasteners (field test)
+Real fasteners from a local mechanic (hex, socket-head, countersunk and flange heads; rusted and
+zinc-plated) were photographed on the printed mat with an iPhone, both through the live web app
+(full resolution, 3600 px) and via a messaging app (compressed to 1280x960, ~4 px/mm).
 
-| Metric | Result |
+| Observation on real photos | What the agent did / what we changed |
 |---|---|
-| Photos / bolts | |
-| Identified on first photo | |
-| Correct thread spec when identified | |
-| Diameter error (mean / max) | |
-| Length error (mean / max) | |
-| Pitch error (mean / max) | |
-| Asked for new photo / asked human | |
-| Cloud latency p50 / p95 (CloudWatch) | |
+| All photos: 4/4 markers found; print scale verified (marker size vs spacing within 1%) | rectification worked on every photo |
+| Mat lying on a soft cloth, paper rippled: markers disagree by 4.5 mm | **correctly** asked to lay the mat flat (2 photos) |
+| Cast shadows segmented as metal (dark wedge beside the bolt) | **fixed**: pixel must be darker than ~52% of local paper brightness, then grown back to the true half-way edge within 0.8 mm |
+| Markers printed grey, not black: sharp photos wrongly judged blurry | **fixed**: sharpness normalised by marker contrast (blurry 0.3-0.4 vs sharp 4.8-18) and measured at native resolution |
+| Bright zinc-plated shank lighter than the threshold: one bolt seen as "2 objects" | **fixed**: pieces lying on the long piece's axis are bridged; a genuine second bolt off-axis is still rejected |
+| Same flange bolt, 3 photos | web upload #1: pitch FFT weak, agent asked for a closer photo; web upload #2: **M8 x 60 flange bolt**, pitch 1.31 mm (enhanced edges); compressed copy: **M8 x 60 flange bolt**, pitch 1.29 mm. Consistent across photos and resolutions |
+| Compressed 1280x960 photos (~4 px/mm) | below the 6 px/mm gate, so the live agent asks for a closer photo; with the gate lowered for analysis, pitch readings cluster near 1.0 mm (a compression artefact), confirming the gate is needed |
+
+**Ground truth:** the deadline did not leave time to caliper-measure these fasteners, so this is a
+qualitative field test (consistency and failure handling), not an accuracy figure. All fixes were
+re-validated on the synthetic set (8/8 still correct).
 
 ## 8. Limitations
 - Requires the printed mat (scale reference). Printing at the wrong scale gives wrong sizes; the
   mat has a 100 mm check ruler.
-- Synthetic results are optimistic; real rust, glare and shadows are harder.
+- Synthetic results are optimistic; real rust, glare and shadows are harder. Real-photo accuracy
+  has not yet been measured against a caliper (section 7.2).
+- Photos compressed by messaging apps fall below the 6 px/mm needed for thread pitch.
 - The silhouette under-reads major diameter by about 0.3 mm on synthetic threads (thread crests on
   top and bottom are half a pitch out of phase); to be calibrated on the real set.
 - A bolt lying flat sits ~d/2 above the paper, causing a small magnification (< 2% at normal distance).

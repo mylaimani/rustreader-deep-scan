@@ -35,17 +35,19 @@ The agentic part: **what OpenCV sees decides what happens next**. Missing marker
 - Rust destroys thread edges. A single binary outline was not enough for heavy rust, so the agent chooses between two edge tools and checks FFT peak confidence.
 - Countersunk screws: the cone hides where the head ends, and their nominal length includes the head. The head shape is now classified from the side profile.
 - Uneven workshop lighting: a single threshold failed, so we model the paper brightness locally with a large median filter.
+- Real shadows: in our field photos the bolt's shadow was segmented as metal. We now require a pixel to be darker than about half the local paper brightness, then grow the outline back to the true half-way edge within 0.8 mm.
 - Deploying OpenCV 5 to Lambda without Docker: we bundle the manylinux aarch64 wheels (146 MB unzipped) via S3.
 
 ### Accomplishments that we're proud of
-- Correct thread spec on 8/8 synthetic bolts (fine thread under heavy rust, inch UNC, partially threaded, countersunk, socket head), pitch error ≤ 0.01 mm, and 3/3 bad photos correctly sent back.
-- Real rusted fasteners from a workshop identified end to end on AWS (see report section 7.2).
+- Correct thread spec on 8/8 synthetic bolts with exact ground truth (fine thread under heavy rust, inch UNC, partially threaded, countersunk, socket head), pitch error ≤ 0.01 mm, and 3/3 bad photos correctly sent back.
+- A field test with real fasteners from a local mechanic found four failure modes synthetic data missed (cast shadows read as metal, grey-printed markers misjudged as blur, shiny zinc shanks splitting one bolt into two, rippled paper). Three are fixed and the fourth is correctly caught by the agent. The same flange bolt photographed separately is identified consistently as M8 x 60 (pitch 1.29 / 1.31 mm). See report section 7.2.
 - Full round trip on Lambda (Graviton) under 1 second.
 
 ### What we learned
 Measurement beats classification for this problem: with a calibrated mat, size is geometry, not guesswork, and needs no training data. And an agent that knows when to ask for a better photo is more useful than one that always answers.
 
 ### What's next for RustReader
+- Caliper-measured real test set to report real-world accuracy.
 - Bring this pipeline into the RustReader Flutter app (offline on-device scan + cloud deep scan).
 - Nuts, washers, pan/button heads; thread-pitch from a close-up without the mat.
 - Shop stock lookup: scan → "available at 2 shops near you" with our industrial-supply partner.

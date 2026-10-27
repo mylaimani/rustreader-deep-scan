@@ -7,8 +7,10 @@ import numpy as np
 
 from vision import mat_layout
 
-# Below this, marker edges in the straightened image are too soft (blurry photo).
-MINIMUM_MARKER_SHARPNESS = 120.0
+# Below this, marker edges are too soft (blurry photo). The value is the Laplacian variance
+# divided by the marker's contrast squared (x1000), so grey-printed markers are not penalised.
+# Measured: blurry photos 0.3-0.4, sharp real/synthetic photos 4.8-18.
+MINIMUM_MARKER_SHARPNESS = 1.5
 # Below this, the paper looks grey instead of white (photo too dark).
 MINIMUM_PAPER_BRIGHTNESS = 90.0
 
@@ -34,7 +36,9 @@ def measure_marker_sharpness(rectified_bgr, photo_pixels_per_mm=mat_layout.PIXEL
         marker_gray = cv2.cvtColor(marker_crop, cv2.COLOR_BGR2GRAY)
         if shrink < 1.0:
             marker_gray = cv2.resize(marker_gray, None, fx=shrink, fy=shrink, interpolation=cv2.INTER_AREA)
-        sharpness_values.append(cv2.Laplacian(marker_gray, cv2.CV_64F).var())
+        laplacian_variance = cv2.Laplacian(marker_gray, cv2.CV_64F).var()
+        contrast = np.percentile(marker_gray, 95) - np.percentile(marker_gray, 5)
+        sharpness_values.append(1000.0 * laplacian_variance / (contrast ** 2 + 1e-6))
     return float(np.median(sharpness_values))
 
 
@@ -55,6 +59,6 @@ def assess_image_quality(rectified_bgr, photo_pixels_per_mm=mat_layout.PIXELS_PE
         problems.append("blurry")
     if brightness < MINIMUM_PAPER_BRIGHTNESS:
         problems.append("too_dark")
-    return {"marker_sharpness": round(sharpness, 1),
+    return {"marker_sharpness": round(sharpness, 2),
             "paper_brightness": round(brightness, 1),
             "problems": problems}

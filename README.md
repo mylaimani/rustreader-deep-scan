@@ -11,6 +11,19 @@ Built for the OpenCV AI Competition 2026 (Agentic Vision path).
 **Code:** https://github.com/mylaimani/rustreader-deep-scan
 **Demo video:** _(paste link)_
 
+## Judge checklist (where to find each item)
+| Requirement | Where |
+|---|---|
+| Technical report | [docs/RustReader_Technical_Report.pdf](docs/RustReader_Technical_Report.pdf) (source: [docs/TECHNICAL_REPORT.md](docs/TECHNICAL_REPORT.md)) |
+| Pinned dependencies | [requirements.txt](requirements.txt), [infra/requirements-lambda.txt](infra/requirements-lambda.txt) (OpenCV 5.0.0.93) |
+| Build / deploy / test instructions | sections 1-3 below |
+| Architecture diagram (OpenCV 5 + AWS + agent) | [docs/architecture.png](docs/architecture.png) |
+| Working web endpoint | link above |
+| Evaluation incl. failure cases | report section 7; `eval/` ([synthetic results](eval/synthetic_ground_truth_results_summary.txt)); real photos in `samples/real/` |
+| **Agentic Vision:** workflow diagram (perception, decision, action) | [docs/agent_workflow.png](docs/agent_workflow.png) |
+| **Agentic Vision:** trace showing OpenCV 5 output changes the next step | [docs/sample_traces/](docs/sample_traces/): heavy rust switches the edge tool; bad photos lead to targeted re-shoot requests; unreadable threads lead to a closer photo, then human confirmation; real rippled mat, then a real flange bolt. Live: every result page shows its trace. |
+| **Agentic Vision:** task success, failure handling, observability, human control | report sections 5, 7; CloudWatch dashboard `RustReader` (agent outcomes, p50/p95 latency, errors); human-in-the-loop on ambiguous sizes; fixed safety text |
+
 ## How it works (one paragraph)
 The user places the bolt on a printed A4 mat with four ArUco markers and takes a photo.
 An agent runs OpenCV 5 tools in a **perception → decision → action loop**: markers give scale
