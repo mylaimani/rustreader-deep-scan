@@ -1,0 +1,12 @@
+action,designation_correct,diameter_error_mm,length_error_mm,measured_diameter_mm,measured_length_mm,measured_pitch_mm,milliseconds,notes,photo_file,pitch_confidence,pitch_error_mm,predicted_designation,trace_steps,true_designation
+final_identification,True,0.33,0.0,7.67,40.0,1.25,195,synthetic,../samples/synthetic/M8x40_rusty.jpg,126.95,0.0,M8,8,M8
+final_identification,True,0.33,0.0,11.67,50.0,1.25,145,synthetic fine thread,../samples/synthetic/M12x1.25x50_heavy.jpg,124.87,0.0,M12x1.25,8,M12x1.25
+final_identification,True,0.44,0.02,7.5,38.08,1.41,133,synthetic inch,../samples/synthetic/UNC_5-16x1.5.jpg,60.51,0.001,5/16-18 UNC,8,5/16-18 UNC
+final_identification,True,0.17,0.0,5.83,20.0,0.992,121,synthetic clean,../samples/synthetic/M6x20_clean.jpg,25.4,0.008,M6,8,M6
+final_identification,True,0.25,0.0,10.25,80.0,1.499,131,synthetic partially threaded,../samples/synthetic/M10x80_partial.jpg,95.32,0.001,M10,8,M10
+final_identification,True,0.33,0.0,7.67,40.0,1.25,125,one marker covered,../samples/synthetic/fail_corner_hidden.jpg,128.97,0.0,M8,8,M8
+request_new_photo,,,,,,,104,expected: reshoot (blurry),../samples/synthetic/fail_blurry.jpg,,,,2,M8
+request_new_photo,,,,,,,121,expected: reshoot (two objects),../samples/synthetic/fail_two_bolts.jpg,,,,3,M8
+request_new_photo,,0.17,0.0,10.17,30.0,,122,expected: closer photo (threads unreadable),../samples/synthetic/fail_threads_worn_M10.jpg,8.18,,,8,M10
+final_identification,True,0.17,0.33,5.83,16.33,1.0,120,synthetic countersunk,../samples/synthetic/M6x16_countersunk.jpg,31.19,0.0,M6,8,M6
+final_identification,True,0.33,0.0,7.67,25.0,1.25,125,synthetic socket head,../samples/synthetic/M8x25_socket.jpg,87.43,0.0,M8,8,M8

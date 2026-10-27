@@ -1,0 +1,55 @@
+"""
+Checks whether the photo is good enough to measure. The agent uses these
+numbers to decide whether to ask the user for another photo.
+"""
+import cv2
+import numpy as np
+
+from vision import mat_layout
+
+# Below this, marker edges in the straightened image are too soft (blurry photo).
+MINIMUM_MARKER_SHARPNESS = 120.0
+# Below this, the paper looks grey instead of white (photo too dark).
+MINIMUM_PAPER_BRIGHTNESS = 90.0
+
+
+def crop_mm_region(rectified_image, left_mm, top_mm, right_mm, bottom_mm):
+    """Cut a rectangle (given in mm) out of the straightened mat image."""
+    scale = mat_layout.PIXELS_PER_MM
+    return rectified_image[int(top_mm * scale):int(bottom_mm * scale),
+                           int(left_mm * scale):int(right_mm * scale)]
+
+
+def measure_marker_sharpness(rectified_bgr):
+    """Variance of the Laplacian over the marker squares. Markers are pure
+    black/white, so soft edges here mean the whole photo is blurred."""
+    sharpness_values = []
+    for left_mm, top_mm in mat_layout.MARKER_TOP_LEFT_MM.values():
+        right_mm = left_mm + mat_layout.MARKER_SIDE_MM
+        bottom_mm = top_mm + mat_layout.MARKER_SIDE_MM
+        marker_crop = crop_mm_region(rectified_bgr, left_mm, top_mm, right_mm, bottom_mm)
+        marker_gray = cv2.cvtColor(marker_crop, cv2.COLOR_BGR2GRAY)
+        sharpness_values.append(cv2.Laplacian(marker_gray, cv2.CV_64F).var())
+    return float(np.median(sharpness_values))
+
+
+def measure_paper_brightness(rectified_bgr):
+    """Median brightness of the white work area (0-255)."""
+    x_min, y_min, x_max, y_max = mat_layout.WORK_AREA_MM
+    work_area = crop_mm_region(rectified_bgr, x_min, y_min, x_max, y_max)
+    work_area_gray = cv2.cvtColor(work_area, cv2.COLOR_BGR2GRAY)
+    return float(np.median(work_area_gray))
+
+
+def assess_image_quality(rectified_bgr):
+    """Return a dict with the quality numbers and a list of problems found."""
+    sharpness = measure_marker_sharpness(rectified_bgr)
+    brightness = measure_paper_brightness(rectified_bgr)
+    problems = []
+    if sharpness < MINIMUM_MARKER_SHARPNESS:
+        problems.append("blurry")
+    if brightness < MINIMUM_PAPER_BRIGHTNESS:
+        problems.append("too_dark")
+    return {"marker_sharpness": round(sharpness, 1),
+            "paper_brightness": round(brightness, 1),
+            "problems": problems}
