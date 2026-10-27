@@ -78,13 +78,16 @@ def perceive_mat(session, photo_bgr):
 def straighten_and_check_quality(session, photo_bgr, found_markers):
     """Homography + rectification + blur/brightness check. Returns (rectified, response)."""
     homography, reprojection_error_mm = marker_detection.compute_photo_to_mat_homography(found_markers)
-    if homography is None or reprojection_error_mm > MAXIMUM_REPROJECTION_ERROR_MM:
+    # Allow at least 3 photo pixels of corner error: on smaller photos one pixel is a bigger share of a mm
+    photo_pixels_per_mm = marker_detection.estimate_photo_pixels_per_mm(found_markers)
+    allowed_error_mm = max(MAXIMUM_REPROJECTION_ERROR_MM, 3.0 / max(photo_pixels_per_mm, 1.0))
+    if homography is None or reprojection_error_mm > allowed_error_mm:
         add_trace_step(session, "compute_homography", {"reprojection_error_mm": reprojection_error_mm},
                        "request_new_photo", "markers do not agree on one flat sheet (mat bent or folded?)")
         return None, respond_request_new_photo(session, "mat_not_flat",
                                                "The mat doesn't look flat. Lay it flat on a table and try again.")
     rectified = marker_detection.rectify_photo_to_mat(photo_bgr, homography)
-    quality = image_quality.assess_image_quality(rectified)
+    quality = image_quality.assess_image_quality(rectified, photo_pixels_per_mm)
     quality["reprojection_error_mm"] = round(reprojection_error_mm, 3)
     quality["markers_used"] = len(found_markers)
     if "blurry" in quality["problems"]:

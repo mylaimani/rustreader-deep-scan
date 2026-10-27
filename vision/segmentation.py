@@ -11,9 +11,12 @@ import numpy as np
 
 from vision import mat_layout
 
-DARKER_THAN_PAPER_BY = 45          # grey levels
+DARKER_THAN_PAPER_BY = 45          # grey levels, minimum
+SHADOW_REJECT_FRACTION = 0.52      # must be darker than paper by this share of paper brightness;
+                                   # soft shadows only dim paper by ~20-40%, steel by 60%+
 MINIMUM_RUST_SATURATION = 70       # HSV saturation (0-255)
 MINIMUM_OBJECT_AREA_MM2 = 15.0
+EDGE_GROW_MM = 0.8
 BORDER_INSET_MM = 3.0              # skip the dashed outline printed on the mat
 
 
@@ -28,18 +31,35 @@ def estimate_paper_background(gray_image):
                       interpolation=cv2.INTER_LINEAR)
 
 
+def grow_core_to_true_edge(core_mask, gray_image, paper_background):
+    """The strict core misses the blurred rim of the bolt. Within EDGE_GROW_MM of the
+    core, also accept pixels darker than half-way between bolt and paper (the true
+    edge). Shadows further away, or lighter than half-way, stay out."""
+    if not core_mask.any():
+        return core_mask
+    bolt_brightness = float(np.median(gray_image[core_mask > 0]))
+    halfway = (paper_background.astype(np.float32) + bolt_brightness) / 2
+    grow_pixels = max(int(EDGE_GROW_MM * mat_layout.PIXELS_PER_MM), 1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * grow_pixels + 1, 2 * grow_pixels + 1))
+    near_core = cv2.dilate(core_mask, kernel) > 0
+    rim_pixels = near_core & (gray_image.astype(np.float32) < halfway)
+    return np.where((core_mask > 0) | rim_pixels, 255, 0).astype(np.uint8)
+
+
 def build_object_mask(work_area_bgr):
     """Binary mask (255 = fastener) for the work area."""
     work_area_gray = cv2.cvtColor(work_area_bgr, cv2.COLOR_BGR2GRAY)
     work_area_gray = cv2.GaussianBlur(work_area_gray, (5, 5), 0)
     paper_background = estimate_paper_background(work_area_gray)
     darkness = cv2.subtract(paper_background, work_area_gray)
-    dark_pixels = darkness > DARKER_THAN_PAPER_BY
+    required_darkness = np.maximum(DARKER_THAN_PAPER_BY, SHADOW_REJECT_FRACTION * paper_background.astype(np.float32))
+    dark_pixels = darkness > required_darkness
 
     saturation = cv2.cvtColor(work_area_bgr, cv2.COLOR_BGR2HSV)[:, :, 1]
     coloured_pixels = saturation > MINIMUM_RUST_SATURATION
 
-    object_mask = np.where(dark_pixels | coloured_pixels, 255, 0).astype(np.uint8)
+    core_mask = np.where(dark_pixels | coloured_pixels, 255, 0).astype(np.uint8)
+    object_mask = grow_core_to_true_edge(core_mask, work_area_gray, paper_background)
     small_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     object_mask = cv2.morphologyEx(object_mask, cv2.MORPH_OPEN, small_kernel)
     closing_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
